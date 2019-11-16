@@ -1,5 +1,6 @@
 # Importing libraries
-from keras.layers import Embedding, Flatten
+from keras.layers import Embedding
+from keras.layers import Flatten
 from keras.models import Sequential
 from keras import layers
 from keras.preprocessing.text import Tokenizer
@@ -13,7 +14,7 @@ from datetime import time
 import tensorflow as tf
 
 # Reading input data of IMBD reviews
-df = pd.read_csv('imdb_master.csv',encoding='latin-1')
+df = pd.read_csv('imdb_master.csv', encoding='latin-1')
 print(df.head())
 sentences = df['review'].values
 y = df['label'].values
@@ -23,7 +24,7 @@ max_review_len = max([len(s.split()) for s in sentences])
 print('Maximum length of review is', max_review_len)
 
 # Tokenizing data
-tokenizer = Tokenizer(num_words=max_review_len)
+tokenizer = Tokenizer(num_words=2000)
 tokenizer.fit_on_texts(sentences)
 
 # Preparation of data for embedding layer
@@ -34,7 +35,7 @@ padded_docs = pad_sequences(sentences, maxlen=max_review_len)
 # Encoding target associated with IMDB data of reviews
 le = preprocessing.LabelEncoder()
 y = le.fit_transform(y)
-X_train, X_test, y_train, y_test = train_test_split(sentences, y, test_size=0.25, random_state=1000)
+X_train, X_test, y_train, y_test = train_test_split(padded_docs, y, test_size=0.25, random_state=1000)
 
 # Model defined and fit
 model = Sequential()
@@ -52,7 +53,7 @@ model.add(layers.Dense(3, activation='softmax'))
 model.compile(loss='sparse_categorical_crossentropy', optimizer='adam', metrics=['acc'])
 
 # Model fit using training data set
-history = model.fit(X_train, y_train, epochs=1, verbose=True, validation_data=(X_test, y_test), batch_size=256)
+history = model.fit(X_train, y_train, epochs=5, verbose=True, validation_data=(X_test, y_test), batch_size=256)
 
 # Evaluation of the performance of the model fit
 [test_loss, test_acc] = model.evaluate(X_test, y_test)
