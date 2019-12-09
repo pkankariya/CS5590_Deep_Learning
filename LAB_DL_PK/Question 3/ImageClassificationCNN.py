@@ -1,72 +1,66 @@
 # Import appropriate libraries
-import numpy
+import numpy as np
+import os
+import cv2
 import matplotlib.pyplot as plt
-from keras.datasets import cifar10
+from keras.callbacks import TensorBoard
 from keras.models import Sequential
-from keras.layers import Dense
+from keras.layers import Dense, MaxPool2D
 from keras.layers import Dropout
 from keras.layers import Flatten
 from keras.constraints import maxnorm
 from keras.optimizers import SGD
 from keras.layers.convolutional import Conv2D
 from keras.layers.convolutional import MaxPooling2D
-from keras.utils import np_utils
+from keras.utils import np_utils, to_categorical
 from keras import backend as K
-K.set_image_dim_ordering('th')
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import LabelEncoder
 
-# Fix random seed for reproducibility
-seed = 7
-numpy.random.seed(seed)
+# Load data of natural images
+labels = os.listdir('natural_images/')
+x = [] # Feature predictor variables array
+y = [] # Target variables array
 
-# Load data
-(x_train, y_train), (x_test, y_test) = cifar10.load_data()
+for label in labels:
+    pics = os.listdir('natural_images/{}/'.format(label))
+    for pic in pics:
+        image = cv2.imread('natural_images/{}/{}'.format(label, pic))
+        image_resized = cv2.resize(image, (32, 32))
+        x.append(np.array(image_resized))
+        y.append(label)
 
-# Normalize inputs from 0-255 to 0.0-1.0
-x_train = x_train.astype('float32')
-x_test = x_test.astype('float32')
-x_train = x_train / 255.0
-x_test = x_test / 255.0
+x = np.array(x)
+y = np.array(y)
 
-# One hot encode outputs
-y_train = np_utils.to_categorical(y_train)
-y_test = np_utils.to_categorical(y_test)
-num_classes = y_test.shape[1]
+x = x.astype('float32') / 255
+enc = LabelEncoder().fit(y)
+y_encoded = enc.transform(y)
+y = to_categorical(y_encoded)
 
-# Build the convolutional neural network model
+# Splitting data set into training and test data set
+x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.33)
+
+# Build the neural network model
 # Define the model being built
 model = Sequential()
 # Convolutional layer
-model.add(Conv2D(32, (3, 3), input_shape=(3, 32, 32), padding='same', activation='relu', kernel_constraint=maxnorm(3)))
-model.add(Dropout(0.2))
-model.add(Conv2D(32, (3, 3), activation='relu', padding='same', kernel_constraint=maxnorm(3)))
-model.add(MaxPooling2D(pool_size=(2, 2)))
-model.add(Conv2D(64,(3,3),activation='relu',padding='same',kernel_constraint=maxnorm(3)))
-model.add(Dropout(0.2))
-model.add(Conv2D(64,(3,3),activation='relu',padding='same',kernel_constraint=maxnorm(3)))
-model.add(MaxPooling2D(pool_size=(2, 2)))
-model.add(Conv2D(128,(3,3),activation='relu',padding='same',kernel_constraint=maxnorm(3)))
-model.add(Dropout(0.2))
-model.add(Conv2D(128,(3,3),activation='relu',padding='same',kernel_constraint=maxnorm(3)))
-model.add(MaxPooling2D(pool_size=(2, 2)))
+model.add(Conv2D(filters=32, kernel_size=(5, 5), activation='relu', input_shape=x_train.shape[1:]))
+model.add(MaxPool2D(pool_size=(2, 2)))
+model.add(Conv2D(filters=64, kernel_size=(3, 3), activation='relu'))
+model.add(MaxPool2D(pool_size=(2, 2)))
+model.add(Dropout(rate=0.25))
 # Flatten layer
 model.add(Flatten())
-model.add(Dropout(0.2))
-model.add(Dense(1024, activation='relu', kernel_constraint=maxnorm(3)))
-model.add(Dropout(0.2))
-model.add(Dense(512, activation='relu', kernel_constraint=maxnorm(3)))
-model.add(Dropout(0.2))
-model.add(Dense(num_classes, activation='softmax'))
-
+model.add(Dense(256, activation='relu'))
+model.add(Dropout(rate=0.5))
+model.add(Dense(8, activation='softmax'))
 # Compile the model defined
-epochs = 25
-lrate = 0.01
-decay = lrate/epochs
-sgd = SGD(lr=lrate, momentum=0.9, decay=decay, nesterov=False)
-model.compile(loss='categorical_crossentropy', optimizer=sgd, metrics=['accuracy'])
+model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
 print(model.summary())
 
 # Fit the model defined on the training data set
-history = model.fit(x_train, y_train, validation_data=(x_test, y_test), epochs=epochs, batch_size=2000)
+history = model.fit(x_train, y_train, validation_data=(x_test, y_test), epochs=5, batch_size=2000)
 
 # Final evaluation of the model using the test data set
 scores = model.evaluate(x_test, y_test, verbose=0)
@@ -93,5 +87,36 @@ plt.plot(history.history['val_loss'])
 plt.xlabel('epoch')
 plt.ylabel('Loss of Data')
 plt.title('Evaluation of Data Loss')
+plt.legend(['TrainData', 'ValidationData'], loc='upper right')
+plt.show()
+
+# Visualization of the model using tensor board
+tbCallBack = TensorBoard(log_dir='./lab2_1', histogram_freq=0, write_graph=True, write_images=True)
+
+# Fitting the model defined using the training data along with validation using test data
+history = model.fit(x_train, y_train, validation_data=(x_test, y_test), epochs=10, verbose=0, initial_epoch=0, callbacks=[tbCallBack])
+
+# Evaluation of the loss and accuracy associated to the test data set
+[test_loss, test_acc] = model.evaluate(x_test, y_test)
+print("Evaluation result on Test Data using Tensorflow : Loss = {}, accuracy = {}".format(test_loss, test_acc))
+
+# Listing all the components of data present in history
+print('The data components present in history using Tensorflow are', history.history.keys())
+
+# Graphical evaluation of accuracy associated with training and validation data
+plt.plot(history.history['acc'])
+plt.plot(history.history['val_acc'])
+plt.title('Evaluation of Data Accuracy using Tensorflow')
+plt.xlabel('epoch')
+plt.ylabel('Accuracy of Data')
+plt.legend(['TrainData', 'ValidationData'], loc='upper right')
+plt.show()
+
+# Graphical evaluation of loss associated with training and validation data
+plt.plot(history.history['loss'])
+plt.plot(history.history['val_loss'])
+plt.xlabel('epoch')
+plt.ylabel('Loss of Data')
+plt.title('Evaluation of Data Loss using Tensorflow')
 plt.legend(['TrainData', 'ValidationData'], loc='upper right')
 plt.show()
