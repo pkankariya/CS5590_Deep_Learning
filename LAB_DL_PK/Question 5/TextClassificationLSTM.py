@@ -89,7 +89,7 @@ plt.show()
 tbCallBack = TensorBoard(log_dir='./lab2_1', histogram_freq=0, write_graph=True, write_images=True)
 
 # Fitting the model defined using the training data along with validation using test data
-history = model.fit(x_train, y_train, validation_data=(x_test, y_test), epochs=10, verbose=0, initial_epoch=0, callbacks=[tbCallBack])
+history = model.fit(x_train, y_train, validation_data=(x_test, y_test), epochs=2, verbose=0, initial_epoch=0, callbacks=[tbCallBack])
 
 # Evaluation of the loss and accuracy associated to the test data set
 [test_loss, test_acc] = model.evaluate(x_test, y_test)
